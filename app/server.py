@@ -113,12 +113,9 @@ def startup_event():
 @app.on_event("shutdown")
 def shutdown_event():
     # clean up
-    """
-        [TO BE IMPLEMENTED]
-        1. Make sure to flush the log file and close any file pointers to avoid corruption
-        2. Any other cleanups
-    """
     logger.info("Shutting down application")
+    logger.complete()
+    logger.remove()
 
 
 @app.post("/predict", response_model=PredictResponse)
