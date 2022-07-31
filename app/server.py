@@ -7,6 +7,9 @@ from sentence_transformers import SentenceTransformer
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 
+from datetime import datetime
+
+
 GLOBAL_CONFIG = {
     "model": {
         "featurizer": {
@@ -70,32 +73,21 @@ class NewsCategoryClassifier:
             ('classifier', model)
         ])
 
-    def predict_proba(self, model_input: dict) -> dict:
-        """
-        [TO BE IMPLEMENTED]
-        Using the `self.pipeline` constructed during initialization, 
-        run model inference on a given model input, and return the 
-        model prediction probability scores across all labels
+        self.classes = self.pipeline.classes_
 
-        Output format: 
-        {
-            "label_1": model_score_label_1,
-            "label_2": model_score_label_2 
-            ...
-        }
-        """
-        return {}
+    def predict_proba(self, model_input: dict) -> dict:
+        output = self.pipeline.predict_proba(
+            [model_input['description']]
+        )[0]
+
+        return {label: score for label, score in zip(self.classes, output)}
 
     def predict_label(self, model_input: dict) -> str:
-        """
-        [TO BE IMPLEMENTED]
-        Using the `self.pipeline` constructed during initialization,
-        run model inference on a given model input, and return the
-        model prediction label
+        output = self.pipeline.predict(
+            [model_input['description']]
+        )[0]
 
-        Output format: predicted label for the model input
-        """
-        return ""
+        return output
 
 
 app = FastAPI()
@@ -120,22 +112,28 @@ def shutdown_event():
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(request: PredictRequest):
-    # get model prediction for the input request
-    # construct the data to be logged
-    # construct response
-    """
-        [TO BE IMPLEMENTED]
-        1. run model inference and get model predictions for model inputs specified in `request`
-        2. Log the following data to the log file (the data should be logged to the file that was opened in `startup_event`, and writes to the path defined in GLOBAL_CONFIG['service']['log_destination'])
-        {
-            'timestamp': <YYYY:MM:DD HH:MM:SS> format, when the request was received,
-            'request': dictionary representation of the input request,
-            'prediction': dictionary representation of the response,
-            'latency': time it took to serve the request, in millisec
-        }
-        3. Construct an instance of `PredictResponse` and return
-    """
-    return {}
+    t0 = datetime.utcnow()
+
+    request_dict = request.dict()
+
+    scores = classifier.predict_proba(request_dict)
+    label = classifier.predict_label(request_dict)
+
+    response = PredictResponse(
+        scores=scores,
+        label=label
+    )
+
+    t1 = datetime.utcnow()
+
+    logger.info({
+        'timestamp': t0.strftime('%Y-%m-%d %H:%M:%S'),
+        'request': request_dict,
+        'prediction': response.dict(),
+        'latency': round((t1 - t0).total_seconds() * 1000)
+    })
+
+    return response
 
 
 @app.get("/")
