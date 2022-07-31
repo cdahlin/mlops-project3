@@ -54,13 +54,17 @@ class TransformerFeaturizer(BaseEstimator, TransformerMixin):
 class NewsCategoryClassifier:
     def __init__(self, config: dict) -> None:
         self.config = config
-        """
-        [TO BE IMPLEMENTED]
-        1. Load the sentence transformer model and initialize the `featurizer` of type `TransformerFeaturizer` (Hint: revisit Week 1 Step 4)
-        2. Load the serialized model as defined in GLOBAL_CONFIG['model'] into memory and initialize `model`
-        """
-        featurizer = None
-        model = None
+
+        sentence_transformer_model = SentenceTransformer(
+            self.config['featurizer']['sentence_transformer_model']
+        )
+        featurizer = TransformerFeaturizer(
+            dim=self.config['featurizer']['sentence_transformer_embedding_dim'],
+            sentence_transformer_model=sentence_transformer_model
+        )
+
+        model = joblib.load(self.config['classifier']['serialized_model_path'])
+
         self.pipeline = Pipeline([
             ('transformer_featurizer', featurizer),
             ('classifier', model)
@@ -95,17 +99,14 @@ class NewsCategoryClassifier:
 
 
 app = FastAPI()
+classifier = None
 
 @app.on_event("startup")
 def startup_event():
-    """
-        [TO BE IMPLEMENTED]
-        2. Initialize the `NewsCategoryClassifier` instance to make predictions online. You should pass any relevant config parameters from `GLOBAL_CONFIG` that are needed by NewsCategoryClassifier 
-        3. Open an output file to write logs, at the destimation specififed by GLOBAL_CONFIG['service']['log_destination']
-        
-        Access to the model instance and log file will be needed in /predict endpoint, make sure you
-        store them as global variables
-    """
+    global classifier
+    classifier = NewsCategoryClassifier(config=GLOBAL_CONFIG['model'])
+
+    logger.add(GLOBAL_CONFIG['service']['log_destination'])
     logger.info("Setup completed")
 
 
